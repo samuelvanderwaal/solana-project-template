@@ -1,19 +1,14 @@
 use crate::error::MplProjectNameError;
-use crate::instruction::{CreateArgs, MplProjectNameInstruction};
+use crate::instruction::{accounts::CreateAccounts, CreateArgs, MplProjectNameInstruction};
 use crate::state::{Key, MyAccount, MyData};
 use borsh::BorshDeserialize;
 use solana_program::{
-    account_info::{next_account_info, AccountInfo},
-    entrypoint::ProgramResult,
-    msg,
-    program::invoke,
-    pubkey::Pubkey,
-    rent::Rent,
-    system_instruction, system_program,
-    sysvar::Sysvar,
+    account_info::AccountInfo, entrypoint::ProgramResult, msg, program::invoke, pubkey::Pubkey,
+    rent::Rent, system_instruction, system_program, sysvar::Sysvar,
 };
 
 pub struct Processor;
+
 impl Processor {
     pub fn process_instruction<'a>(
         _program_id: &Pubkey,
@@ -31,11 +26,11 @@ impl Processor {
     }
 }
 
-fn create<'a>(accounts: &'a [AccountInfo], args: CreateArgs) -> ProgramResult {
+fn create<'a>(accounts: &'a [AccountInfo<'a>], args: CreateArgs) -> ProgramResult {
     let ctx = CreateAccounts::context(accounts)?;
 
     let address = ctx.accounts.address;
-    let authority = ctx.accounts.authority;
+    let _authority = ctx.accounts.authority;
     let payer = ctx.accounts.payer;
     let system_program = ctx.accounts.system_program;
 
@@ -78,4 +73,6 @@ fn create<'a>(accounts: &'a [AccountInfo], args: CreateArgs) -> ProgramResult {
     };
 
     // No need to serialize the data back into the account, it's already there.
+
+    Ok(())
 }
