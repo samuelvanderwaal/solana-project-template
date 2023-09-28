@@ -15,9 +15,9 @@ use solana_program::{
 
 pub struct Processor;
 impl Processor {
-    pub fn process_instruction(
+    pub fn process_instruction<'a>(
         _program_id: &Pubkey,
-        accounts: &[AccountInfo],
+        accounts: &'a [AccountInfo<'a>],
         instruction_data: &[u8],
     ) -> ProgramResult {
         let instruction: MplProjectNameInstruction =
@@ -31,13 +31,14 @@ impl Processor {
     }
 }
 
-fn create(accounts: &[AccountInfo], args: CreateArgs) -> ProgramResult {
-    // Accounts.
-    let account_info_iter = &mut accounts.iter();
-    let address = next_account_info(account_info_iter)?;
-    let authority = next_account_info(account_info_iter)?;
-    let payer = next_account_info(account_info_iter)?;
-    let system_program = next_account_info(account_info_iter)?;
+fn create<'a>(accounts: &'a [AccountInfo], args: CreateArgs) -> ProgramResult {
+    let ctx = CreateAccounts::context(accounts)?;
+
+    let address = ctx.accounts.address;
+    let authority = ctx.accounts.authority;
+    let payer = ctx.accounts.payer;
+    let system_program = ctx.accounts.system_program;
+
     let rent = Rent::get()?;
 
     // Guards.
@@ -61,14 +62,20 @@ fn create(accounts: &[AccountInfo], args: CreateArgs) -> ProgramResult {
         &[payer.clone(), address.clone(), system_program.clone()],
     )?;
 
-    let my_account = MyAccount {
-        key: Key::MyAccount,
-        authority: *authority.key,
-        data: MyData {
-            foo: args.foo,
-            bar: args.bar,
-        },
+    // Get a mutable reference to the account data.
+    let my_account_data = &mut (*address.data).borrow_mut();
+
+    // Get the mutable byte muck version of the account so we can mutate the data directly.
+    let my_account = MyAccount::from_bytes(my_account_data);
+
+    // Now can operate on the struct like a normal Rust struct but the bytes are cast directly
+    // without deserializ/serializ(ing).
+    my_account.key = Key::MyAccount;
+    my_account.authority = *ctx.accounts.authority.key;
+    my_account.data = MyData {
+        alice: args.alice,
+        bob: args.bob,
     };
 
-    my_account.save(address)
+    // No need to serialize the data back into the account, it's already there.
 }
