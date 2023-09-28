@@ -1,12 +1,24 @@
 #![cfg(feature = "test-bpf")]
 
-use borsh::BorshDeserialize;
-use mpl_project_name::{instruction::CreateArgs, state::MyAccount};
+use mpl_project_name::{
+    instruction::{
+        builders::{CreateBuilder, InstructionBuilder},
+        CreateArgs,
+    },
+    state::MyAccount,
+};
+
 use solana_program_test::{tokio, ProgramTest};
 use solana_sdk::{
     signature::{Keypair, Signer},
     transaction::Transaction,
 };
+
+macro_rules! account {
+    ($type:ty, $account_var:ident) => {{
+        <$type>::from_bytes($account_var.data.as_mut())
+    }};
+}
 
 #[tokio::test]
 async fn create() {
@@ -14,15 +26,19 @@ async fn create() {
         .start_with_context()
         .await;
 
-    let address = Keypair::new();
-    let create_args = CreateArgs { foo: 1, bar: 2 };
+    let alice = 1;
+    let bob = [2u8; 32];
 
-    let ix = mpl_project_name::instruction::create(
-        &address.pubkey(),
-        &context.payer.pubkey(),
-        &context.payer.pubkey(),
-        create_args,
-    );
+    let address = Keypair::new();
+    let create_args = CreateArgs { alice, bob };
+
+    let ix = CreateBuilder::new()
+        .address(address.pubkey())
+        .authority(context.payer.pubkey())
+        .payer(context.payer.pubkey())
+        .build(create_args)
+        .unwrap()
+        .instruction();
 
     let tx = Transaction::new_signed_with_payer(
         &[ix],
@@ -40,11 +56,11 @@ async fn create() {
 
     assert!(account.is_some());
 
-    let account = account.unwrap();
+    let mut account = account.unwrap();
     assert_eq!(account.data.len(), MyAccount::LEN);
 
-    let mut account_data = account.data.as_ref();
-    let my_account = MyAccount::deserialize(&mut account_data).unwrap();
-    assert_eq!(my_account.data.foo, 1);
-    assert_eq!(my_account.data.bar, 2);
+    let my_account = account!(MyAccount, account);
+
+    assert_eq!(my_account.data.alice, alice);
+    assert_eq!(my_account.data.bob, bob);
 }
